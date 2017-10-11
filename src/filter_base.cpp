@@ -133,7 +133,14 @@ namespace RobotLocalization
     // However, this presents trouble for robots that may incur rotational error as a result of linear motion (and
     // vice-versa). Instead, we create a diagonal matrix whose diagonal values are the vector norm of the state's
     // velocity. We use that to scale the process noise covariance.
-    Eigen::MatrixXd velocityMatrix(TWIST_SIZE, TWIST_SIZE);
+
+    if (state.segment(POSITION_V_OFFSET, TWIST_SIZE).norm() < 1e-4)
+    {
+      dynamicProcessNoiseCovariance_.setIdentity();
+      dynamicProcessNoiseCovariance_ *= 1e-12;
+    }
+
+   /* Eigen::MatrixXd velocityMatrix(TWIST_SIZE, TWIST_SIZE);
     velocityMatrix.setIdentity();
     velocityMatrix.diagonal() *= state.segment(POSITION_V_OFFSET, TWIST_SIZE).norm();
 
@@ -147,7 +154,7 @@ namespace RobotLocalization
     dynamicProcessNoiseCovariance_.block<TWIST_SIZE, TWIST_SIZE>(POSITION_V_OFFSET, POSITION_V_OFFSET) =
       velocityMatrix *
       processNoiseCovariance_.block<TWIST_SIZE, TWIST_SIZE>(POSITION_V_OFFSET, POSITION_V_OFFSET) *
-      velocityMatrix.transpose();
+      velocityMatrix.transpose();*/
   }
 
   const Eigen::VectorXd& FilterBase::getControl()
