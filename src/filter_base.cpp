@@ -141,6 +141,13 @@ namespace RobotLocalization
       velocityMatrix *
       processNoiseCovariance_.block<TWIST_SIZE, TWIST_SIZE>(POSITION_OFFSET, POSITION_OFFSET) *
       velocityMatrix.transpose();
+
+    velocityMatrix.diagonal() = state.segment(POSITION_V_OFFSET, TWIST_SIZE);
+
+    dynamicProcessNoiseCovariance_.block<TWIST_SIZE, TWIST_SIZE>(POSITION_V_OFFSET, POSITION_V_OFFSET) =
+      velocityMatrix *
+      processNoiseCovariance_.block<TWIST_SIZE, TWIST_SIZE>(POSITION_V_OFFSET, POSITION_V_OFFSET) *
+      velocityMatrix.transpose();
   }
 
   const Eigen::VectorXd& FilterBase::getControl()
