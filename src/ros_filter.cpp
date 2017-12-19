@@ -2184,6 +2184,11 @@ namespace RobotLocalization
         curMeasTf.getRotation(), curMeas(StateMemberRoll), curMeas(StateMemberPitch), curMeas(StateMemberYaw));
 
       RF_DEBUG("Final measurement is:\n" << measurement->measurement_ << "\n");
+
+      measurement->covariance_.noalias() += previousMeasurementStates_[measurement->topicName_]->estimateErrorCovariance_;
+
+      // Zero out the off-diagonal values
+      measurement->covariance_ = measurement->covariance_.diagonal().asDiagonal();
     }
 
   }
@@ -2680,6 +2685,11 @@ namespace RobotLocalization
         double dummy, yaw;
         targetFrameTrans.getBasis().getRPY(dummy, dummy, yaw);
         rot.setRPY(0.0, 0.0, yaw);
+      }
+      else if (callbackData.differential_)
+      {
+        const Eigen::VectorXd &state = filter_.getState();
+        rot.setRPY(state(StateMemberRoll), state(StateMemberPitch), state(StateMemberYaw));
       }
       else
       {
