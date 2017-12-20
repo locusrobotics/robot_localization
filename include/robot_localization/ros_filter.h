@@ -526,6 +526,7 @@ template<class T> class RosFilter
     //! state estimate. This holds the measurements used for step (2).
     //!
     std::map<std::string, tf2::Transform> previousMeasurements_;
+    std::map<std::string, Eigen::MatrixXd> previousMeasurementCovariances_;
 
     std::map<std::string, FilterStatePtr> previousMeasurementStates_;
 

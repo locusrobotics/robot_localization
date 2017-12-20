@@ -574,7 +574,7 @@ namespace RobotLocalization
           // we need to walk through each of them and do so.
           while (!differentialTopicsToSave.empty())
           {
-            if (smoothLaggedData_)
+            if (smoothLaggedData_ && !filterStateHistory_.empty())
             {
               // If we're smoothing, we *always* save the filter state and associate it with the most recent
               // measurement (after this while loop), so we can skip that one here.
@@ -2188,7 +2188,7 @@ namespace RobotLocalization
       measurement->covariance_.noalias() += previousMeasurementStates_[measurement->topicName_]->estimateErrorCovariance_;
 
       // Zero out the off-diagonal values
-      measurement->covariance_ = measurement->covariance_.diagonal().asDiagonal();
+      measurement->covariance_ = measurement->covariance_.diagonal().eval().asDiagonal();
     }
 
   }
@@ -2763,11 +2763,19 @@ namespace RobotLocalization
       // measurement.
       curMeasurement = poseTmp;
 
+      measurementCovariance.block(0, 0, POSE_SIZE, POSE_SIZE) = covarianceRotated.block(0, 0, POSE_SIZE, POSE_SIZE);
+
       if (callbackData.differential_)
       {
         if (previousMeasurements_.count(callbackData.topicName_) == 0)
         {
           previousMeasurements_.insert(std::pair<std::string, tf2::Transform>(callbackData.topicName_, curMeasurement));
+          previousMeasurementCovariances_.insert(std::pair<std::string, Eigen::MatrixXd>(callbackData.topicName_, measurementCovariance));
+        }
+        else
+        {
+          // We accumulate differential pose source errors until such time as we receive an absolute pose measurement
+          measurementCovariance += previousMeasurementCovariances_[callbackData.topicName_];
         }
 
         // 7a. If we are carrying out differential integration and we have a previous measurement for this sensor, then
@@ -2784,6 +2792,7 @@ namespace RobotLocalization
                  "\nAfter removing previous measurement, measurement delta is:\n" << poseTmp << "\n");
 
         previousMeasurements_[callbackData.topicName_] = curMeasurement;
+        previousMeasurementCovariances_[callbackData.topicName_] = measurementCovariance;
       }
       else
       {
@@ -2797,6 +2806,32 @@ namespace RobotLocalization
 
           tf2::Transform initialMeasurement = initialMeasurements_[callbackData.topicName_];
           poseTmp.setData(initialMeasurement.inverseTimes(poseTmp));
+        }
+        else
+        {
+          // If we are fusing an absolute pose source, then we should update all the differential pose source covariances.
+          Eigen::Map<Eigen::VectorXi> updateVectorEigen(updateVector.data(), updateVector.size());
+          Eigen::MatrixXd keepMask = updateVectorEigen.cast<double>().asDiagonal();
+          Eigen::MatrixXd resetMask = (Eigen::VectorXi::Ones(updateVector.size()) - updateVectorEigen).cast<double>().asDiagonal();
+          std::map<std::string, Eigen::MatrixXd>::iterator prevCovarIt;
+          for (
+            prevCovarIt = previousMeasurementCovariances_.begin();
+            prevCovarIt != previousMeasurementCovariances_.end();
+            ++prevCovarIt)
+          {
+            // We'll only update if all the pose data that is provided by this measurement has lower variance than that
+            // same data in the other measurements.
+            bool better = true;
+            for (size_t i = 0; i < POSE_SIZE && better; ++i)
+            {
+              if (updateVector[i])
+              {
+                better = measurementCovariance(i, i) < prevCovarIt->second(i, i);
+              }
+            }
+            prevCovarIt->second = resetMask * prevCovarIt->second.eval() * resetMask.transpose() +
+              keepMask * (better ? measurementCovariance : prevCovarIt->second.eval()) * keepMask.transpose();
+          }
         }
 
         // 7c. Finally, we just apply the target frame transformation
@@ -2815,8 +2850,6 @@ namespace RobotLocalization
       measurement(StateMemberRoll) = roll;
       measurement(StateMemberPitch) = pitch;
       measurement(StateMemberYaw) = yaw;
-
-      measurementCovariance.block(0, 0, POSE_SIZE, POSE_SIZE) = covarianceRotated.block(0, 0, POSE_SIZE, POSE_SIZE);
 
       // 9. Handle 2D mode
       if (twoDMode_)
