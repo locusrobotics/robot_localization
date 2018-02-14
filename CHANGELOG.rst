@@ -4,6 +4,8 @@ Changelog for package robot_localization
 
 2.4.1 (2017-11-27)
 ------------------
+* 2.4.1-2 (2018-02-14)
+* Fixing issue with invalidated pointer
 * 2.4.1-1 (2017-11-27)
 * Silencing unnecessary errors and warnings
 * Correctly handling state restoration.
