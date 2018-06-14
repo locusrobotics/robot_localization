@@ -1930,6 +1930,8 @@ namespace RobotLocalization
   {
     RF_DEBUG("------ RosFilter::setPoseCallback ------\nPose message:\n" << *msg);
 
+    ROS_INFO_STREAM("Received pose set request: " << *msg);
+
     std::string topicName("setPose");
 
     // Get rid of any initial poses (pretend we've never had a measurement)
